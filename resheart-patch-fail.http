@@ -1,0 +1,50 @@
+// create a database : tests
+PUT http://localhost:9997/tests
+Content-Type: application/json
+
+{ "descr": "tests database"}
+###
+
+// create a collection : foo in tests db
+PUT http://localhost:9997/tests/foo
+Content-Type: application/json
+
+{"descr": "tests.foo collection"}
+###
+
+// create an unique sparsed index on the tests.foo collection
+PUT http://localhost:9997/tests/foo/_indexes/ids-code HTTP/1.1
+Content-Type: application/json
+
+{
+  "keys": {"ids.code": 1}, "ops": {"unique": true, "partialFilterExpression": { "ids.code": { "$exists": true }}}
+}
+###
+
+// create documents, one with code field with explicit null value
+POST http://localhost:9997/tests/foo
+Content-Type: application/json
+
+[
+  { "_id": "doc-1", "ids": [{"orgUnitId": "AIX41", "code": "4100001"}, {"orgUnitId": "AIX42", "code": "4200002"}]},
+  { "_id": "doc-2", "ids": [{"orgUnitId": "AIX43","code": "430001"}]},
+  { "_id": "doc-3", "ids": [{"orgUnitId": "AIX45","code": null}]}
+]
+###
+
+// update doucment doc-2
+// - if If-Match header is missing : 409 Conflict, "message": "The ETag must be provided using the 'If-Match' header"
+// - if If-Match header is provided but with wrong value : 412 (Precondition Failed); as expected
+// - if If-Match header is provided with correct value : 200 (OK) band a new Etag value in response header but document and etag are not updated --> BUG
+PATCH http://localhost:9997/tests/foo/doc-2
+Content-Type: application/json
+If-Match: 616e8933d2952e020a01c395
+
+{
+  "$set": {
+    "ids": [
+      {"orgUnitId": "AIX43","code": "430001"},
+      {"orgUnitId": "AIX44"}
+    ]
+  }
+}
